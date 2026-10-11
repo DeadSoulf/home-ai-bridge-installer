@@ -51,8 +51,24 @@ choose_storage() {
 }
 
 say "HOME AI Bridge — установка Proxmox LXC без токенов GitHub"
+printf '%s\n' "HOME AI Bridge будет слушать 0.0.0.0:8787. Для агентов сохраняется обязательная авторизация."
+printf '%s\n' "1 — создать новый LXC"
+printf '%s\n' "2 — установить в уже созданный Debian 13 LXC (обойти проблемный pct create)"
+printf 'Режим [1]: ' >/dev/tty
+IFS= read -r mode </dev/tty || die "Ввод прерван"
+if [[ "$mode" == 2 ]]; then
+  WORKDIR="$(mktemp -d /tmp/home-ai-bridge-mode-XXXXXXXX)"
+  chmod 0700 "$WORKDIR"
+  curl -q --fail --silent --show-error --location \
+    --proto '=https' --proto-redir '=https' --tlsv1.2 \
+    --output "$WORKDIR/install-existing.sh" \
+    "https://raw.githubusercontent.com/DeadSoulf/home-ai-bridge-installer/main/install-existing.sh" ||
+    die "Не удалось скачать установщик для существующего LXC"
+  bash "$WORKDIR/install-existing.sh"
+  exit $?
+fi
+[[ -z "$mode" || "$mode" == 1 ]] || die "Неизвестный режим установки"
 printf '%s\n' "Будет создан новый Debian 13 LXC. Существующие контейнеры не изменятся."
-printf '%s\n\n' "HOME AI Bridge будет слушать 0.0.0.0:8787. Для агентов сохраняется обязательная авторизация."
 
 next_id="$(pvesh get /cluster/nextid 2>/dev/null | tr -cd '0-9' | head -c 9)"
 [[ "$next_id" =~ ^[0-9]{3,9}$ ]] || die "Нет свободного CTID"
