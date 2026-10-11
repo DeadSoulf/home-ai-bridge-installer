@@ -95,10 +95,29 @@ printf 'Введите yes для создания нового контейне
 IFS= read -r confirmation </dev/tty || die "Ввод прерван"
 [[ "$confirmation" == "yes" ]] || die "Отменено до создания CT."
 
-printf 'GitHub fine-grained PAT (Contents: Read), скрытый ввод: ' >/dev/tty
-IFS= read -r -s TOKEN </dev/tty || die "Ввод токена прерван"
-printf '\n' >/dev/tty
-[[ "$TOKEN" =~ ^[a-zA-Z0-9_-]{16,512}$ ]] || die "Неверный формат GitHub токена"
+say "Для скачивания приватного репозитория требуется GitHub Personal Access Token."
+printf '%s\n' "Создать токен: https://github.com/settings/personal-access-tokens/new" >/dev/tty
+printf '%s\n' "Repository access: Only select repositories -> home-ai-bridge" >/dev/tty
+printf '%s\n' "Repository permissions: Contents = Read-only" >/dev/tty
+printf '%s\n' "При вставке в веб-консоль Proxmox используйте Ctrl+Shift+V или Shift+Insert." >/dev/tty
+printf '%s\n' "Ввод скрыт: при вставке токена на экране не появятся символы." >/dev/tty
+for attempt in 1 2 3; do
+  printf 'GitHub PAT (попытка %s/3): ' "$attempt" >/dev/tty
+  IFS= read -r -s TOKEN </dev/tty || die "Ввод токена прерван"
+  printf '\n' >/dev/tty
+  TOKEN="${TOKEN%$'\r'}"
+  # Accept copy/paste artifacts, but never print or log any part of the credential.
+  TOKEN="${TOKEN#"${TOKEN%%[![:space:]]*}"}"
+  TOKEN="${TOKEN%"${TOKEN##*[![:space:]]}"}"
+  if [[ "$TOKEN" == \"*\" && "${#TOKEN}" -ge 2 ]]; then TOKEN="${TOKEN:1:${#TOKEN}-2}"; fi
+  if [[ "$TOKEN" == \'*\' && "${#TOKEN}" -ge 2 ]]; then TOKEN="${TOKEN:1:${#TOKEN}-2}"; fi
+  if [[ "$TOKEN" =~ ^[a-zA-Z0-9_-]{16,512}$ ]]; then break; fi
+  TOKEN=""
+  if [[ "$attempt" == 3 ]]; then
+    die "Токен не распознан после трёх попыток. Проверьте PAT Contents: Read и повторите запуск."
+  fi
+  printf '%s\n' "Токен пустой или содержит посторонние символы. Вставьте значение PAT без URL и лишнего текста." >/dev/tty
+done
 WORKDIR="$(mktemp -d /tmp/home-ai-bridge-XXXXXXXX)"
 chmod 0700 "$WORKDIR"
 
